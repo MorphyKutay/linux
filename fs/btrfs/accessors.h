@@ -3,7 +3,7 @@
 #ifndef BTRFS_ACCESSORS_H
 #define BTRFS_ACCESSORS_H
 
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
 #include <linux/align.h>
@@ -12,6 +12,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <uapi/linux/btrfs_tree.h>
+#include "extent_io.h"
 
 struct extent_buffer;
 

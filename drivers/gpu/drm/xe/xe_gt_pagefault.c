@@ -10,15 +10,16 @@
 
 #include <drm/drm_exec.h>
 #include <drm/drm_managed.h>
-#include <drm/ttm/ttm_execbuf_util.h>
 
 #include "abi/guc_actions_abi.h"
 #include "xe_bo.h"
 #include "xe_gt.h"
+#include "xe_gt_stats.h"
 #include "xe_gt_tlb_invalidation.h"
 #include "xe_guc.h"
 #include "xe_guc_ct.h"
 #include "xe_migrate.h"
+#include "xe_svm.h"
 #include "xe_trace_bo.h"
 #include "xe_vm.h"
 
@@ -125,18 +126,22 @@ static int xe_pf_begin(struct drm_exec *exec, struct xe_vma *vma,
 	return 0;
 }
 
-static int handle_vma_pagefault(struct xe_tile *tile, struct pagefault *pf,
-				struct xe_vma *vma)
+static int handle_vma_pagefault(struct xe_gt *gt, struct xe_vma *vma,
+				bool atomic)
 {
 	struct xe_vm *vm = xe_vma_vm(vma);
+	struct xe_tile *tile = gt_to_tile(gt);
 	struct drm_exec exec;
 	struct dma_fence *fence;
 	ktime_t end = 0;
 	int err;
-	bool atomic;
+
+	lockdep_assert_held_write(&vm->lock);
+
+	xe_gt_stats_incr(gt, XE_GT_STATS_ID_VMA_PAGEFAULT_COUNT, 1);
+	xe_gt_stats_incr(gt, XE_GT_STATS_ID_VMA_PAGEFAULT_KB, xe_vma_size(vma) / 1024);
 
 	trace_xe_vma_pagefault(vma);
-	atomic = access_is_atomic(pf->access_type);
 
 	/* Check if VMA is valid */
 	if (vma_is_valid(tile, vma) && !atomic)
@@ -185,28 +190,36 @@ unlock_dma_resv:
 	return err;
 }
 
+static struct xe_vm *asid_to_vm(struct xe_device *xe, u32 asid)
+{
+	struct xe_vm *vm;
+
+	down_read(&xe->usm.lock);
+	vm = xa_load(&xe->usm.asid_to_vm, asid);
+	if (vm && xe_vm_in_fault_mode(vm))
+		xe_vm_get(vm);
+	else
+		vm = ERR_PTR(-EINVAL);
+	up_read(&xe->usm.lock);
+
+	return vm;
+}
+
 static int handle_pagefault(struct xe_gt *gt, struct pagefault *pf)
 {
 	struct xe_device *xe = gt_to_xe(gt);
-	struct xe_tile *tile = gt_to_tile(gt);
 	struct xe_vm *vm;
 	struct xe_vma *vma = NULL;
 	int err;
+	bool atomic;
 
 	/* SW isn't expected to handle TRTT faults */
 	if (pf->trva_fault)
 		return -EFAULT;
 
-	/* ASID to VM */
-	mutex_lock(&xe->usm.lock);
-	vm = xa_load(&xe->usm.asid_to_vm, pf->asid);
-	if (vm && xe_vm_in_fault_mode(vm))
-		xe_vm_get(vm);
-	else
-		vm = NULL;
-	mutex_unlock(&xe->usm.lock);
-	if (!vm)
-		return -EINVAL;
+	vm = asid_to_vm(xe, pf->asid);
+	if (IS_ERR(vm))
+		return PTR_ERR(vm);
 
 	/*
 	 * TODO: Change to read lock? Using write lock for simplicity.
@@ -224,7 +237,13 @@ static int handle_pagefault(struct xe_gt *gt, struct pagefault *pf)
 		goto unlock_vm;
 	}
 
-	err = handle_vma_pagefault(tile, pf, vma);
+	atomic = access_is_atomic(pf->access_type);
+
+	if (xe_vma_is_cpu_addr_mirror(vma))
+		err = xe_svm_handle_pagefault(vm, vma, gt_to_tile(gt),
+					      pf->page_addr, atomic);
+	else
+		err = handle_vma_pagefault(gt, vma, atomic);
 
 unlock_vm:
 	if (!err)
@@ -256,12 +275,13 @@ static void print_pagefault(struct xe_device *xe, struct pagefault *pf)
 		 "\tFaultType: %d\n"
 		 "\tAccessType: %d\n"
 		 "\tFaultLevel: %d\n"
-		 "\tEngineClass: %d\n"
+		 "\tEngineClass: %d %s\n"
 		 "\tEngineInstance: %d\n",
 		 pf->asid, pf->vfid, pf->pdata, upper_32_bits(pf->page_addr),
 		 lower_32_bits(pf->page_addr),
 		 pf->fault_type, pf->access_type, pf->fault_level,
-		 pf->engine_class, pf->engine_instance);
+		 pf->engine_class, xe_hw_engine_class_to_str(pf->engine_class),
+		 pf->engine_instance);
 }
 
 #define PF_MSG_LEN_DW	4
@@ -548,14 +568,9 @@ static int handle_acc(struct xe_gt *gt, struct acc *acc)
 	if (acc->access_type != ACC_TRIGGER)
 		return -EINVAL;
 
-	/* ASID to VM */
-	mutex_lock(&xe->usm.lock);
-	vm = xa_load(&xe->usm.asid_to_vm, acc->asid);
-	if (vm)
-		xe_vm_get(vm);
-	mutex_unlock(&xe->usm.lock);
-	if (!vm || !xe_vm_in_fault_mode(vm))
-		return -EINVAL;
+	vm = asid_to_vm(xe, acc->asid);
+	if (IS_ERR(vm))
+		return PTR_ERR(vm);
 
 	down_read(&vm->lock);
 

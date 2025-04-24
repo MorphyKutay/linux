@@ -15,7 +15,7 @@ use kernel::firmware::Firmware;
 use kernel::net::phy::{
     self,
     reg::{Mmd, C45},
-    DeviceId, Driver,
+    Driver,
 };
 use kernel::prelude::*;
 use kernel::sizes::{SZ_16K, SZ_8K};
@@ -23,10 +23,10 @@ use kernel::sizes::{SZ_16K, SZ_8K};
 kernel::module_phy_driver! {
     drivers: [PhyQT2025],
     device_table: [
-        DeviceId::new_with_driver::<PhyQT2025>(),
+        phy::DeviceId::new_with_driver::<PhyQT2025>(),
     ],
     name: "qt2025_phy",
-    author: "FUJITA Tomonori <fujita.tomonori@gmail.com>",
+    authors: ["FUJITA Tomonori <fujita.tomonori@gmail.com>"],
     description: "AMCC QT2025 PHY driver",
     license: "GPL",
     firmware: ["qt2025-2.0.3.3.fw"],
@@ -41,7 +41,7 @@ impl Driver for PhyQT2025 {
 
     fn probe(dev: &mut phy::Device) -> Result<()> {
         // Check the hardware revision code.
-        // Only 0x3b works with this driver and firmware.
+        // Only 0xb3 works with this driver and firmware.
         let hw_rev = dev.read(C45::new(Mmd::PMAPMD, 0xd001))?;
         if (hw_rev >> 8) != 0xb3 {
             return Err(code::ENODEV);

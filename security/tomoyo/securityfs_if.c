@@ -233,15 +233,13 @@ static void __init tomoyo_create_entry(const char *name, const umode_t mode,
  *
  * Returns 0.
  */
-int __init tomoyo_interface_init(void)
+static int __init tomoyo_interface_init(void)
 {
 	struct tomoyo_domain_info *domain;
 	struct dentry *tomoyo_dir;
 
-#ifndef CONFIG_SECURITY_TOMOYO_LKM
 	if (!tomoyo_enabled)
 		return 0;
-#endif
 	domain = tomoyo_domain();
 	/* Don't create securityfs entries unless registered. */
 	if (domain != &tomoyo_kernel_domain)
@@ -272,6 +270,4 @@ int __init tomoyo_interface_init(void)
 	return 0;
 }
 
-#ifndef CONFIG_SECURITY_TOMOYO_LKM
 fs_initcall(tomoyo_interface_init);
-#endif

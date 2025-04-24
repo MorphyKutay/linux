@@ -16,7 +16,7 @@
 #include <linux/string.h>
 #include <linux/module.h>
 #include <net/mac80211.h>
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 #include <linux/sysfs.h>
 
 #include "mac.h"
@@ -714,8 +714,8 @@ static void disconnect(struct usb_interface *intf)
 	mac = plfxlc_hw_mac(hw);
 	usb = &mac->chip.usb;
 
-	del_timer_sync(&usb->tx.tx_retry_timer);
-	del_timer_sync(&usb->sta_queue_cleanup);
+	timer_delete_sync(&usb->tx.tx_retry_timer);
+	timer_delete_sync(&usb->sta_queue_cleanup);
 
 	ieee80211_unregister_hw(hw);
 
