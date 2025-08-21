@@ -117,6 +117,7 @@ static short int check_and_handle_sdw_dma_irq(struct acp63_dev_data *adata, u32 
 					break;
 				case ACP70_PCI_REV:
 				case ACP71_PCI_REV:
+				case ACP72_PCI_REV:
 					adata->acp70_sdw0_dma_intr_stat[stream_id] = 1;
 					break;
 				}
@@ -141,6 +142,7 @@ static short int check_and_handle_sdw_dma_irq(struct acp63_dev_data *adata, u32 
 		break;
 	case ACP70_PCI_REV:
 	case ACP71_PCI_REV:
+	case ACP72_PCI_REV:
 		if (ext_intr_stat1 & ACP70_P1_SDW_DMA_IRQ_MASK) {
 			for (index = ACP70_P1_AUDIO2_RX_THRESHOLD;
 			     index <= ACP70_P1_AUDIO0_TX_THRESHOLD; index++) {
@@ -193,6 +195,7 @@ static irqreturn_t acp63_irq_handler(int irq, void *dev_id)
 	struct amd_sdw_manager *amd_manager;
 	u32 ext_intr_stat, ext_intr_stat1;
 	u16 irq_flag = 0;
+	u16 wake_irq_flag = 0;
 	u16 sdw_dma_irq_flag = 0;
 
 	adata = dev_id;
@@ -231,7 +234,7 @@ static irqreturn_t acp63_irq_handler(int irq, void *dev_id)
 	}
 
 	if (adata->acp_rev >= ACP70_PCI_REV)
-		irq_flag = check_and_handle_acp70_sdw_wake_irq(adata);
+		wake_irq_flag = check_and_handle_acp70_sdw_wake_irq(adata);
 
 	if (ext_intr_stat & BIT(PDM_DMA_STAT)) {
 		ps_pdm_data = dev_get_drvdata(&adata->pdm_dev->dev);
@@ -245,7 +248,7 @@ static irqreturn_t acp63_irq_handler(int irq, void *dev_id)
 	if (sdw_dma_irq_flag)
 		return IRQ_WAKE_THREAD;
 
-	if (irq_flag)
+	if (irq_flag | wake_irq_flag)
 		return IRQ_HANDLED;
 	else
 		return IRQ_NONE;
@@ -551,6 +554,7 @@ static int acp_hw_init_ops(struct acp63_dev_data *adata, struct pci_dev *pci)
 		break;
 	case ACP70_PCI_REV:
 	case ACP71_PCI_REV:
+	case ACP72_PCI_REV:
 		acp70_hw_init_ops(adata->hw_ops);
 		break;
 	default:
@@ -580,6 +584,7 @@ static int snd_acp63_probe(struct pci_dev *pci,
 	case ACP63_PCI_REV:
 	case ACP70_PCI_REV:
 	case ACP71_PCI_REV:
+	case ACP72_PCI_REV:
 		break;
 	default:
 		dev_dbg(&pci->dev, "acp63/acp70/acp71 pci device not found\n");

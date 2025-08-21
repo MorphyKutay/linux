@@ -195,9 +195,9 @@ struct _vcs_dpi_soc_bounding_box_st dcn3_5_soc = {
 	.dcn_downspread_percent = 0.5,
 	.gpuvm_min_page_size_bytes = 4096,
 	.hostvm_min_page_size_bytes = 4096,
-	.do_urgent_latency_adjustment = 1,
+	.do_urgent_latency_adjustment = 0,
 	.urgent_latency_adjustment_fabric_clock_component_us = 0,
-	.urgent_latency_adjustment_fabric_clock_reference_mhz = 3000,
+	.urgent_latency_adjustment_fabric_clock_reference_mhz = 0,
 };
 
 void dcn35_build_wm_range_table_fpu(struct clk_mgr *clk_mgr)
@@ -437,7 +437,7 @@ static unsigned int get_vertical_back_porch(struct dc_crtc_timing *timing)
 int dcn35_populate_dml_pipes_from_context_fpu(struct dc *dc,
 					      struct dc_state *context,
 					      display_e2e_pipe_params_st *pipes,
-					      bool fast_validate)
+					      enum dc_validate_mode validate_mode)
 {
 	int i, pipe_cnt;
 	struct resource_context *res_ctx = &context->res_ctx;
@@ -446,7 +446,7 @@ int dcn35_populate_dml_pipes_from_context_fpu(struct dc *dc,
 	const unsigned int max_allowed_vblank_nom = 1023;
 
 	dcn31_populate_dml_pipes_from_context(dc, context, pipes,
-					      fast_validate);
+					      validate_mode);
 
 	for (i = 0, pipe_cnt = 0; i < dc->res_pool->pipe_count; i++) {
 		struct dc_crtc_timing *timing;
