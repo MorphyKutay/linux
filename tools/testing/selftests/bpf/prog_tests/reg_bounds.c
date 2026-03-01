@@ -623,7 +623,7 @@ static void range_cond(enum num_t t, struct range x, struct range y,
 			*newx = range(t, x.a, x.b);
 			*newy = range(t, y.a + 1, y.b);
 		} else if (x.a == x.b && x.b == y.b) {
-			/* X is a constant matching rigth side of Y */
+			/* X is a constant matching right side of Y */
 			*newx = range(t, x.a, x.b);
 			*newy = range(t, y.a, y.b - 1);
 		} else if (y.a == y.b && x.a == y.a) {
@@ -631,7 +631,7 @@ static void range_cond(enum num_t t, struct range x, struct range y,
 			*newx = range(t, x.a + 1, x.b);
 			*newy = range(t, y.a, y.b);
 		} else if (y.a == y.b && x.b == y.b) {
-			/* Y is a constant matching rigth side of X */
+			/* Y is a constant matching right side of X */
 			*newx = range(t, x.a, x.b - 1);
 			*newy = range(t, y.a, y.b);
 		} else {
@@ -2091,7 +2091,7 @@ static struct subtest_case crafted_cases[] = {
 	{U64, S64, {0, 0xffffffffULL}, {0x7fffffff, 0x7fffffff}},
 
 	{U64, U32, {0, 0x100000000}, {0, 0}},
-	{U64, U32, {0xfffffffe, 0x100000000}, {0x80000000, 0x80000000}},
+	{U64, U32, {0xfffffffe, 0x300000000}, {0x80000000, 0x80000000}},
 
 	{U64, S32, {0, 0xffffffff00000000ULL}, {0, 0}},
 	/* these are tricky cases where lower 32 bits allow to tighten 64
