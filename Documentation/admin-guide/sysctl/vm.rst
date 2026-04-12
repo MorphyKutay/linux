@@ -586,14 +586,25 @@ The default is 1 percent.
 mmap_min_addr
 =============
 
-This file indicates the amount of address space  which a user process will
-be restricted from mmapping.  Since kernel null dereference bugs could
-accidentally operate based on the information in the first couple of pages
-of memory userspace processes should not be allowed to write to them.  By
-default this value is set to 0 and no protections will be enforced by the
-security module.  Setting this value to something like 64k will allow the
-vast majority of applications to work correctly and provide defense in depth
-against future potential kernel bugs.
+This sysctl adjusts the DAC-side limit on how low in the virtual address
+space userspace may map memory.  Reserving the lowest pages can reduce the
+impact of some kernel NULL pointer bugs when buggy kernel code mistakenly
+trusts userspace mappings in that range.
+
+The value read and written here is ``dac_mmap_min_addr``.  At boot it is
+initialized from ``CONFIG_DEFAULT_MMAP_MIN_ADDR`` (see ``mm/Kconfig``); many
+defconfigs use a non-zero value such as 4096 bytes.
+
+The effective limit applied by the memory management code is
+``max(dac_mmap_min_addr, CONFIG_LSM_MMAP_MIN_ADDR)`` when
+``CONFIG_LSM_MMAP_MIN_ADDR`` is enabled (see ``security/Kconfig`` and
+``security/min_addr.c``); that build-time floor may be higher than the
+number shown in this sysctl.
+
+Writes require ``CAP_SYS_RAWIO``.  Lowering the limit far enough for
+applications that must map very low addresses typically needs that
+capability or a kernel configured with a lower
+``CONFIG_DEFAULT_MMAP_MIN_ADDR``.
 
 
 mmap_rnd_bits
